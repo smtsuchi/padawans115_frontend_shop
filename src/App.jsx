@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { getAuth, GoogleAuthProvider, signInWithPopup } from "firebase/auth";
 import { getDatabase, ref, set, child, get } from "firebase/database";
+import Message from './Message';
 
-
-const STRIPE_API_KEY = ''
+const BACK_END_URL = process.env.REACT_APP_BACK_END_URL
+const STRIPE_API_KEY = process.env.REACT_APP_STRIPE_API_KEY
 
 
 const ProductCard = ({ productInfo, addToCart }) => {
@@ -32,6 +33,7 @@ export default function App() {
   const [products, setProducts] = useState([])
   const [user, setUser] = useState(getUserFromLS)
   const [cart, setCart] = useState({ size: 0 })
+  const [messages, setMessages] = useState([])
 
   const addToCart = (item) => {
     const copy = { ...cart }
@@ -114,8 +116,35 @@ export default function App() {
       {cart[key].name} x{cart[key].qty}
     </p>))
   }
+  const generateInputTags = () => {
+    return Object.keys(cart).map(key => (key==='size'? <></>: <input key={`input_${key}`} name={cart[key].default_price} defaultValue={cart[key].qty} hidden />))
+  };
 
+  const showMessages = () => {
+    return messages.map(({text, color}, index) => <Message key={index} text={text} color={color} messages={messages} setMessages={setMessages} index={index}/>)
+  }
 
+  useEffect(() => {
+    const query = new URLSearchParams(window.location.search);
+
+    const copy = [...messages]
+
+    if (query.get("success")) {
+      copy.push({
+        text: "Order placed! You will receive an email confirmation.",
+        color: 'success'
+      })
+      setMessages(copy);
+    }
+
+    if (query.get("canceled")) {
+      copy.push({
+        text: "Order canceled -- continue to shop around and checkout when you're ready.",
+        color: 'warning'
+      })
+      setMessages(copy);
+    }
+  }, []);
 
 
   return (
@@ -123,6 +152,8 @@ export default function App() {
       <h1>My Shop</h1>
       <h2>Hello, {user.uid ? user.displayName : "GUEST"}</h2>
       <h4>You have {cart.size} items in your cart.</h4>
+      { showMessages() }
+
       <div className="container">
         <div className="row">
           {showProducts()}
@@ -134,6 +165,14 @@ export default function App() {
       <button onClick={createPopup}>Sign In With Google</button>
       }
       { showCart() }
+      {
+        cart.size===0?<></>:
+        <form action={BACK_END_URL+ '/api/checkout'} method='POST'>
+          {generateInputTags()}
+          <button className='btn btn-success'>Check Out</button>
+        </form>
+      }
+
     </div>
   )
 }
